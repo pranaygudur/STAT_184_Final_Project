@@ -1,0 +1,247 @@
+---
+title: "R Notebook"
+output:
+  html_notebook:
+    df_print: paged
+Name: Pranay Gudur and Sreeram Aleti
+---
+
+Loading all the neccessary libraries
+```{r message = FALSE}
+library(mosaic)
+library(DataComputing)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(tidyverse)
+library(corrplot)
+```
+# Reaserch Question
+#### We wanted to check if there are more males or females affected by heart diseases and what other factors affect heart disease.
+
+# Challenge Encountered
+#### The biggest chalenge we faced was data wrangling as it was very hard to decide what variables can be used to make more sense of the data. 
+
+
+# Key Visualisations 
+
+### Data preparation
+
+#### Loading the dataset
+```{r message = FALSE}
+heart.data <- read.csv("heart.csv")
+names(heart.data) <- c( "age", "sex", "cp", "trestbps", "chol","fbs", "restecg",
+                   "thalach","exang", "oldpeak","slope", "ca", "thal", "target")
+```
+
+A quick glance of the dataset
+```{r message = FALSE}
+head(heart.data,5)
+```
+
+```{r}
+dim(heart.data)
+```
+## Display The Number Of Rows And Columns
+```{r}
+nrow(heart.data )
+ncol(heart.data )
+```
+
+## Understanding the datatype of dataset
+```{r}
+str(data)
+```
+
+## Display The Summary
+```{r}
+summary(heart.data)
+```
+
+## Description of Variables
+#### age - age in years
+#### sex - sex (1 = male; 0 = female)
+#### cp - chest pain type (1 = typical angina; 2 = atypical angina; 3 = non-anginal pain; 4 = asymptomatic)
+#### trestbps - resting blood pressure (in mm Hg on admission to the hospital)
+#### chol - serum cholestoral in mg/dl
+#### fbs - fasting blood sugar > 120 mg/dl (1 = true; 0 = false)
+#### restecg - resting electrocardiographic results (0 = normal; 1 = having ST-T; 2 = hypertrophy)
+#### thalach - maximum heart rate achieved
+#### exang - exercise induced angina (1 = yes; 0 = no)
+#### oldpeak - ST depression induced by exercise relative to rest
+#### slope - the slope of the peak exercise ST segment (1 = upsloping; 2 = flat; 3 = downsloping)
+#### ca - number of major vessels (0-3) colored by flourosopy
+#### thal - 3 = normal; 6 = fixed defect; 7 = reversable defect
+#### target - the predicted attribute - diagnosis of heart disease (angiographic disease status) (Value 0 = < 50%  diameter narrowing; Value 1 = > 50% diameter narrowing)
+
+### Converting data from numeric to their respective types
+```{r}
+heart <- heart.data %>% 
+  mutate(sex = if_else(sex == 1, "MALE", "FEMALE"),
+         fbs = if_else(fbs == 1, ">120", "<=120"),
+         exang = if_else(exang == 1, "YES" ,"NO"),
+         cp = if_else(cp == 0, "TYPICAL ANGINA",
+                      if_else(cp == 1, "ATYPICAL ANGINA",
+                      if_else(cp == 2,"NON-AGINAL PAIN","ASYPMTOMATIC" ))),
+         restecg = if_else(restecg == 0, "NORMAL",
+                           if_else(restecg == 1, "ABNORMALITY", "PROBABLE OR DEFINITE")),
+         slope = as.factor(slope),
+         ca = as.factor(ca),
+         thal = as.factor(thal),
+         target = if_else(target == 1, "YES", "NO")
+         ) %>% 
+  dplyr::select(target, sex, fbs, exang, cp, restecg, slope, ca, thal, everything())
+```
+
+### Summary after pre-processing the data
+```{r}
+summary(heart)
+```
+### Display The Number Of NAs In Each Column
+```{r}
+colSums(is.na(heart))
+```
+
+### No of females and males in the dataset
+```{r}
+heart %>% group_by(sex) %>%
+  summarise(count = n())
+```
+
+### Display th average cholestral among sex
+```{r}
+heart %>% group_by(sex) %>%
+  summarise(avgChol = mean(chol))
+```
+### Display if they have high or low risk from the patients cholestral level 
+```{r}
+LevelOfchol <- function(chol){
+  if_else(chol <= 200, "Desirable Chol",
+                       if_else(chol <= 239,"Borderline high","High risk"))
+}
+heart %>% select(sex,age,chol,target) %>%
+  mutate(RiskFromChol = LevelOfchol(chol))
+```
+
+### Average cholestral level among sex dependiing on the resting ecg they have
+```{r}
+heart %>% group_by(sex,restecg) %>%
+  summarise(avgChol = mean(chol))
+```
+### Target variable Analysis
+```{r}
+# Bar plot for target (Heart disease) 
+heart$target <- as.factor(heart$target)
+ggplot(heart, aes(x=heart$target, fill=heart$target)) + 
+  geom_bar() +
+  xlab("Heart Disease") +
+  ylab("Count") +
+  ggtitle("Analysis of Presence and Absence of Heart Disease") +
+  scale_fill_discrete(name = "Heart Disease", labels = c("Absence", "Presence"))+
+  facet_grid(.~sex)
+```
+There are more females who have no heart disease than males and also more males have heart disease than females.
+
+### Presence and absence of heart disease on the whole dataset
+```{r}
+heart$target <- as.factor(heart$target)
+ggplot(heart, aes(x=heart$target, fill=heart$target)) + 
+  geom_bar() +
+  xlab("Heart Disease") +
+  ylab("Count") +
+  ggtitle("Analysis of Presence and Absence of Heart Disease") +
+  scale_fill_discrete(name = "Heart Disease", labels = c("Absence", "Presence"))
+```
+From the above plot, we can observe that the number of people with heart disease is more than with a number of people having no heart disease. We will perform further analysis to find out more about the relevant parameter for the causes of heart diseases.
+
+### Sex vs Cholestrol
+#### When there is too much cholesterol in your blood, it builds up in the walls of your arteries, causing a process called atherosclerosis, a form of heart disease. 
+```{r}
+g<-ggplot(data=heart)
+g+geom_bar(stat="identity",aes(x=as.factor(heart$sex),y=heart$chol,fill=heart$sex))+xlab("Sex")+ylab("cholestrol")+theme(legend.position = "none")
+```
+We see that females have more cholestrol than males.
+
+### Age vs Cholestrol
+```{r}
+g<-ggplot(data=heart)
+g+geom_bar(stat="identity",aes(x=heart$age,y=heart$chol,fill=as.factor(heart$sex)))+xlab("Age")+ylab("cholestrol")+labs(fill="Color Coding")
+```
+
+### Representation of Cholestrol level
+```{r}
+g<-heart %>% ggplot(aes(x=age,y=chol,col=sex, size=chol))+geom_point(alpha=0.7)+xlab("Age") + 
+           ylab("Cholestoral")+guides(fill = guide_legend(title = "Gender"))
+g
+```
+
+### Representation of Cholestoral level across different defect conditions
+```{r}
+g<-heart %>% ggplot(aes(x=age,y=chol,col=sex, size=chol))+geom_point(alpha=0.7)+xlab("Age") + 
+           ylab("Cholestoral")+facet_grid(.~fbs)
+g
+```
+
+### Males vs Females chest pain and the blood pressure they have
+```{r}
+g<-heart%>%ggplot(aes(x=sex,y=trestbps))+geom_boxplot(fill="darkorange")+xlab("Sex")+ylab("BP")+facet_grid(~cp)
+g
+```
+
+### Machine learning to draw the chance of heart disease depending on other variables
+```{r}
+CompleteCases <- heart.data %>%
+  select(age,cp,trestbps,chol,fbs,restecg,target) %>%
+  na.omit()
+CompleteCases %>% nrow()
+head(CompleteCases)
+```
+```{r}
+mod1 <- party :: ctree(
+  target ~age + cp + chol + fbs + restecg,
+  data = CompleteCases
+)
+plot(mod1, type = "simple")
+```
+We see it does not depend on chol,fasting blood pressure and resting ecg
+## Age by cholestral with smoothening
+```{r message = FLASE}
+age_point <- ggplot(heart.data, aes(age, chol, color = sex, size = chol))+geom_point()+geom_smooth()+theme_classic()+ggtitle("Age by Chol")
+age_point
+```
+# Key Insight/takeaway about research question
+### Looking at the data we were able to say that there is more number of male people suffering from heart diseases than females. We couldnt get conclusive evidence for our second hypothesis of cholestral affects heart disease.
+
+```{r}
+heart2 <- read.csv("framingham.csv")
+heart2 <- heart2 %>% select("male","age","totChol")
+names(heart2) <- c( "sex", "age","chol")
+AgeGroup <- function(age){
+  if_else(age <= 30, "20-30",
+                       if_else(age <= 40 ,"30-40",
+                               if_else(age <= 50,"40-50","60 and above")))
+}
+set.seed(1)
+heart2 <- heart2 %>% 
+  mutate(sex = if_else(sex == 1, "MALE", "FEMALE"))
+heart2 <- heart2 %>% sample_n(303)
+heart2.synthesized <- heart2 %>% mutate(chol =LevelOfchol(chol)) %>%
+  mutate(age = AgeGroup(age)) %>% group_by(age,chol) %>%
+  summarise(count = n())
+ggplot(data=heart2.synthesized,aes(x=chol,y=count ))+geom_bar(stat='identity',position='stack', width=.9)+ facet_wrap(~age,ncol=3) 
+```
+
+```{r}
+heart.synthesized <- heart %>% mutate(chol = LevelOfchol(chol)) %>%
+  mutate(age = AgeGroup(age)) %>% group_by(age,chol) %>%
+  summarise(count = n())
+ggplot(data=heart.synthesized,aes(x=chol,y=count ))+geom_bar(stat='identity',position='stack', width=.9)+ facet_wrap(~age,ncol=3)
+```
+
+We tried to see which age group is more likely to have high cholesterol. So to determine this we tried to import another dataset with similar variables and we could conclude that people who are 60 and above have higher risk of cholesterol.
+
+
+
+
+
+
